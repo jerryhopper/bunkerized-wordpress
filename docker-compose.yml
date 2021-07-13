@@ -1,0 +1,59 @@
+version: '2.1'
+
+services:
+
+mywww:
+    image: bunkerity/bunkerized-nginx
+    restart: always
+    depends_on:
+      - myphp
+    ports:
+      - 80:8080
+      - 443:8443
+    # bunkerized-nginx runs as an unprivileged user with UID/GID 101
+    # don't forget to edit the permissions of the files and folders accordingly
+    volumes:
+      - ./web-files:/www:ro
+      - ./bunker-conf/server-confs:/server-confs:ro         # custom confs at server context for permalinks
+      - ./bunker-conf/modsec-crs-confs:/modsec-crs-confs:ro # custom Core Rule Set confs to add Wordpress exclusions
+      - ./bunker-conf/modsec-confs:/modsec-confs:ro         # avoid some FP with CRS
+      - ./letsencrypt:/etc/letsencrypt
+    environment:
+      - SERVER_NAME=${SERVER_NAME}
+      - PROXY_REAL_IP=${PROXY_REAL_IP}
+      - USE_MODSECURITY=${USE_MODSECURITY}
+      - USE_CLIENT_CACHE=${USE_CLIENT_CACHE}
+      - AUTO_LETS_ENCRYPT=${AUTO_LETS_ENCRYPT}
+      - REDIRECT_HTTP_TO_HTTPS=${REDIRECT_HTTP_TO_HTTPS}
+      - DISABLE_DEFAULT_SERVER=${DISABLE_DEFAULT_SERVER}
+      - USE_GZIP=${USE_GZIP}
+      - REMOTE_PHP=myphp
+      - REMOTE_PHP_PATH=/app
+      
+  myphp:
+    #image: php:fpm
+    build:
+      context: .
+      dockerfile: phpDockerfile
+    restart: always
+    depends_on:
+      - db
+    volumes:
+      - ./web-files:/app
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DB_NAME}
+
+  db:
+    image: mysql:5.7
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - ./db:/var/lib/mysql
+
